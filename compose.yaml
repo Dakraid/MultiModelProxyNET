@@ -1,0 +1,6 @@
+﻿services:
+  multimodelproxy:
+    image: multimodelproxy
+    build:
+      context: .
+      dockerfile: Dockerfile
