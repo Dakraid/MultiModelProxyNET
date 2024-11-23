@@ -4,17 +4,18 @@
 
 namespace MultiModelProxy;
 
+using Models;
+
 public enum Handler { TabbyApi, MistralAi, OpenRouter }
 
 public class Settings
 {
-    public string ApiKey { get; set; } = string.Empty;
-    public bool SillyTavernExtension { get; set; }
-    public string Prompt { get; set; } = string.Empty;
+    public string? ApiKey { get; set; }
+    public string? Prompt { get; set; }
     public string Prefill { get; set; } = "[Continue.]";
     public string Postfill { get; set; } = "[Write the next reply as instructed, taking the thoughts in the chain_of_thought block into account.]";
+    public bool SillyTavernExtension { get; set; }
     public LoggingSettings Logging { get; set; } = new();
-    public RegexSettings Regex { get; set; } = new();
     public InferenceSettings Inference { get; set; } = new();
 }
 
@@ -24,28 +25,20 @@ public class LoggingSettings
     public bool SaveFull { get; set; }
 }
 
-public class RegexSettings
-{
-    public string TextToChat { get; set; }
-        = @"(?P<System>\[INST](.*)\[/INST] Understood\.</s>)|(?P<User>(?<=\[INST])\s([\w|\s]*:)\s(.*?)(?=\[/INST]))|(?P<Assistant>(?<=\[/INST])\s([\w|\s]*:)\s(.*?)(?=</s>))";
-
-    public string Username { get; set; } = @"\[INST]\s*([^\s:]+):\s*[^\[\]]*\[/INST](?!</s>)";
-}
-
 public class InferenceSettings
 {
-    public string PrimaryEndpoint { get; set; } = string.Empty;
+    public string? PrimaryEndpoint { get; set; }
     public int MinCoTTokens { get; set; } = 200;
     public bool UseFallback { get; set; } = true;
     public Handler CotHandler { get; set; } = Handler.MistralAi;
-    public EndpointSettings TabbyApiSettings { get; set; } = new();
-    public EndpointSettings MistralAiSettings { get; set; } = new();
-    public EndpointSettings OpenRouterSettings { get; set; } = new();
+    public EndpointSettings? TabbyApiSettings { get; set; }
+    public EndpointSettings? MistralAiSettings { get; set; }
+    public EndpointSettings? OpenRouterSettings { get; set; }
 }
 
 public class EndpointSettings
 {
-    public string? BaseUri { get; set; } = null;
+    public string? BaseUri { get; set; }
     public string ApiKey { get; set; } = string.Empty;
     public string Model { get; set; } = string.Empty;
 }

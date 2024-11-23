@@ -21,6 +21,27 @@ public class Message
     public string Content { get; set; } = string.Empty;
 }
 
+public class CompletionRequest
+{
+    [JsonPropertyName("model")]
+    public string Model { get; set; } = string.Empty;
+
+    [JsonPropertyName("messages")]
+    public Message[] Messages { get; set; } = [];
+
+    [JsonPropertyName("stream")]
+    public bool Stream { get; set; } = true;
+
+    [JsonPropertyName("temperature")]
+    public float Temperature { get; set; } = 0.7f;
+
+    [JsonPropertyName("top_p")]
+    public float TopP { get; set; } = 0.95f;
+
+    [JsonPropertyName("max_tokens")]
+    public int MaxTokens { get; set; } = 1024;
+}
+
 public class TabbyCompletionRequest
 {
     [JsonPropertyName("messages")]
