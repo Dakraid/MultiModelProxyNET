@@ -4,7 +4,7 @@
 
 namespace MultiModelProxy;
 
-#region
+#region Usings
 using System.Net.Http.Headers;
 #endregion
 
@@ -12,8 +12,14 @@ public static class Utility
 {
     public static async ValueTask<bool> IsAliveAsync(HttpClient httpClient)
     {
-        var result = await httpClient.GetAsync("/health");
-        return result.IsSuccessStatusCode;
+        try {
+            var result = await httpClient.GetAsync("/health");
+            return result.IsSuccessStatusCode;
+        }
+        catch (TaskCanceledException exception)
+        {
+            return false;
+        }
     }
 
     public static void SetHeaders(HttpClient httpClient, IHeaderDictionary headers)

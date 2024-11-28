@@ -4,9 +4,8 @@
 
 namespace MultiModelProxy.Controllers;
 
-#region
+#region Usings
 using System.Buffers;
-using System.ClientModel;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
@@ -40,7 +39,12 @@ public class CompletionController(
     private string _lastStoredCoTMessage = string.Empty;
     private List<Message> _extendedMessages = [];
 
-    private async Task IsAliveAsync() => _isAlive = await Utility.IsAliveAsync(_httpClient).ConfigureAwait(false);
+    private async Task IsAliveAsync()
+    {
+        using var httpClient = httpClientFactory.CreateClient("PrimaryClient");
+        httpClient.Timeout = TimeSpan.FromSeconds(5);
+        _isAlive = await Utility.IsAliveAsync(httpClient).ConfigureAwait(false);
+    }
 
     private async Task GenerateChainOfThoughtAsync()
     {
@@ -49,12 +53,15 @@ public class CompletionController(
             throw new ArgumentNullException();
         }
         
+        logger.LogInformation("Starting Chain of Thought generation.");
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        
         _extendedMessages = new List<Message>(_tabbyRequest.Messages.Count + 3);
         _extendedMessages.AddRange(_tabbyRequest.Messages);
         
-        if (!_lastStoredUserMessage.Equals(_lastUserMessage.Content, StringComparison.OrdinalIgnoreCase))
+        if (!_lastStoredUserMessage.Equals(_lastUserMessage.Content, StringComparison.OrdinalIgnoreCase) || string.IsNullOrWhiteSpace(_lastStoredCoTMessage))
         {
-            var cotPrompt = _settings.Prompt!.Replace("{character}", _tabbyRequest.Character ?? "Character").Replace("{username}", _tabbyRequest.Character ?? "user");
+            var cotPrompt = _settings.Prompt!.Replace("{character}", _tabbyRequest.Character ?? "Character").Replace("{username}", _tabbyRequest.Username ?? "User");
             var cotMessages = new List<Message>(_tabbyRequest.Messages) { new() { Content = cotPrompt, Role = "User" } };
 
             var chatMessages = cotMessages.Select<Message, ChatMessage>(message => message.Role.ToLowerInvariant() switch
@@ -81,6 +88,8 @@ public class CompletionController(
 
         _extendedMessages.Add(new Message { Content = _lastStoredCoTMessage, Role = "assistant" });
         _extendedMessages.Add(new Message { Content = _settings.Postfill, Role = "user" });
+        watch.Stop();
+        logger.LogInformation("Finished Chain of Thought generation. Generation took {timeMs} ms (or {timeSec} s).", watch.ElapsedMilliseconds, watch.ElapsedMilliseconds / 1000);
     }
 
     public async Task<IResult> CompletionAsync(HttpContext context)
@@ -157,27 +166,50 @@ public class CompletionController(
             _httpClient = httpClientFactory.CreateClient("PrimaryClient");
             if (!_isAlive && _settings.Inference.UseFallback)
             {
+                logger.LogInformation("Primary inference endpoint offline and fallback enabled, switching to fallback endpoint.");
                 switch (_settings.Inference.CotHandler)
                 {
                 case Handler.MistralAi:
-                    _httpClient.BaseAddress = new Uri("https://api.mistral.ai/v1");
+                    logger.LogInformation("Using Mistral AI as fallback.");
+                    _httpClient.BaseAddress = new Uri("https://api.mistral.ai/");
                     _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _settings.Inference.MistralAiSettings!.ApiKey);
                     _httpClient.DefaultRequestHeaders.Add("ApiKey", _settings.Inference.MistralAiSettings!.ApiKey);
-                    var mistralAiCompletionRequest = new CompletionRequest
+                    var mistralAiCompletionRequest = new BaseCompletionRequest
                     {
-                        Model = _settings.Inference.MistralAiSettings!.Model, Stream = _tabbyRequest.Stream, Messages = _extendedMessages.ToArray()
+                        Model = _settings.Inference.MistralAiSettings!.Model,
+                        Stop = _tabbyRequest.Stop,
+                        Stream = _tabbyRequest.Stream,
+                        MaxTokens = _tabbyRequest.MaxTokens,
+                        Temperature = _tabbyRequest.Temperature,
+                        FrequencyPenalty = _tabbyRequest.FrequencyPenalty,
+                        PresencePenalty = _tabbyRequest.PresencePenalty,
+                        TopP = _tabbyRequest.TopP,
+                        Messages = _extendedMessages.ToArray(),
+                        RandomSeed = Random.Shared.Next()
                     };
 
                     proxyRequest.Content = new StringContent(JsonSerializer.Serialize(mistralAiCompletionRequest), Encoding.UTF8, "application/json");
                     break;
 
                 case Handler.OpenRouter:
-                    _httpClient.BaseAddress = new Uri("https://openrouter.ai/api/v1");
+                    logger.LogInformation("Using OpeRouter as fallback.");
+                    proxyRequest.RequestUri = new Uri("/api/v1/chat/completions", UriKind.Relative);
+                    _httpClient.BaseAddress = new Uri("https://openrouter.ai");
                     _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _settings.Inference.OpenRouterSettings!.ApiKey);
                     _httpClient.DefaultRequestHeaders.Add("ApiKey", _settings.Inference.OpenRouterSettings!.ApiKey);
-                    var openRouterCompletionRequest = new CompletionRequest
+                    var openRouterCompletionRequest = new OpenRouterBaseCompletionRequest
                     {
-                        Model = _settings.Inference.OpenRouterSettings!.Model, Stream = _tabbyRequest.Stream, Messages = _extendedMessages.ToArray()
+                        Model = _settings.Inference.OpenRouterSettings!.Model,
+                        Stop = _tabbyRequest.Stop,
+                        Stream = _tabbyRequest.Stream,
+                        MaxTokens = _tabbyRequest.MaxTokens,
+                        Temperature = _tabbyRequest.Temperature,
+                        FrequencyPenalty = _tabbyRequest.FrequencyPenalty,
+                        PresencePenalty = _tabbyRequest.PresencePenalty,
+                        TopP = _tabbyRequest.TopP,
+                        Messages = _extendedMessages.ToArray(),
+                        RandomSeed = Random.Shared.Next(),
+                        MinP = _tabbyRequest.MinP ?? 0.05f,
                     };
 
                     proxyRequest.Content = new StringContent(JsonSerializer.Serialize(openRouterCompletionRequest), Encoding.UTF8, "application/json");
@@ -191,6 +223,7 @@ public class CompletionController(
             
             if (_tabbyRequest.Stream)
             {
+                logger.LogInformation("Generating final streaming response.");
                 var response = await _httpClient.SendAsync(proxyRequest, HttpCompletionOption.ResponseHeadersRead, _combinedToken);
 
                 if (!response.IsSuccessStatusCode)
@@ -199,7 +232,7 @@ public class CompletionController(
                     return Results.StatusCode((int) response.StatusCode);
                 }
 
-                var responseContent = await response.Content.ReadAsByteArrayAsync(_combinedToken);
+                var stream = await response.Content.ReadAsStreamAsync(_combinedToken);
 
                 context.Response.OnCompleted(() =>
                 {
@@ -207,23 +240,11 @@ public class CompletionController(
                     return Task.CompletedTask;
                 });
 
-                return Results.Stream(async stream =>
-                {
-                    try
-                    {
-                        await using var memoryStream = _streamManager.GetStream();
-                        await memoryStream.WriteAsync(responseContent, _combinedToken);
-                        memoryStream.Position = 0;
-                        await memoryStream.CopyToAsync(stream, _combinedToken);
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        logger.LogInformation("Stream was forcefully aborted");
-                    }
-                });
+                return Results.Stream(stream);
             }
             else
             {
+                logger.LogInformation("Generating final non-streaming response.");
                 var response = await _httpClient.SendAsync(proxyRequest, _combinedToken);
 
                 if (!response.IsSuccessStatusCode)

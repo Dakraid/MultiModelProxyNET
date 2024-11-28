@@ -4,7 +4,7 @@
 
 namespace MultiModelProxy.Controllers;
 
-#region
+#region Usings
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
@@ -27,7 +27,7 @@ public class GenericProxyController(ILogger<GenericProxyController> logger, IOpt
         if (!await isAliveTask)
         {
             logger.LogError("Primary inference endpoint is offline.");
-            return Results.InternalServerError();
+            return _settings.Inference.UseFallback ? Results.Ok() : Results.InternalServerError();
         }
 
         var response = await httpClient.GetAsync(path);
@@ -49,7 +49,8 @@ public class GenericProxyController(ILogger<GenericProxyController> logger, IOpt
         if (!await isAliveTask)
         {
             logger.LogError("Primary inference endpoint is offline.");
-            return Results.InternalServerError();
+
+            return _settings.Inference.UseFallback ? Results.Ok() : Results.InternalServerError();
         }
 
         request.EnableBuffering();

@@ -4,7 +4,7 @@
 
 namespace MultiModelProxy;
 
-#region
+#region Usings
 using System.ClientModel;
 using Context;
 using Controllers;
@@ -136,6 +136,7 @@ public class Program
 
         builder.Services.AddScoped<GenericProxyController>();
         builder.Services.AddScoped<CompletionController>();
+        builder.Services.AddScoped<ThoughtController>();
 
         builder.Services.AddResponseCompression(options =>
         {
@@ -164,6 +165,9 @@ public class Program
         // Completion Proxy Endpoints
         app.MapPost("/v1/chat/completions", async (HttpContext context, CompletionController controller) => await controller.CompletionAsync(context));
 
+        // Thoughts
+        app.MapGet("/v1/thought", async (HttpContext context, ThoughtController controller) => await controller.GetLastThoughtAsync(context));
+        
         // Generic Proxy Endpoints
         app.MapGet("/{*path}", async (HttpContext context, GenericProxyController controller, string path) => await controller.GenericGetAsync(context, path));
         app.MapPost("/{*path}", async (HttpContext context, GenericProxyController controller, string path) => await controller.GenericPostAsync(context, path));
