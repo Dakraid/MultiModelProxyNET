@@ -39,16 +39,25 @@ public class BaseCompletionRequest
     public float TopP { get; set; } = 1f;
 
     [JsonPropertyName("presence_penalty")]
-    public float PresencePenalty { get; set; } = 0f;
+    public float PresencePenalty { get; set; } = 0.01f;
 
     [JsonPropertyName("frequency_penalty")]
-    public float FrequencyPenalty { get; set; } = 0f;
+    public float FrequencyPenalty { get; set; }
 
     [JsonPropertyName("max_tokens")]
     public int MaxTokens { get; set; } = 1024;
 }
 
-public class OpenRouterBaseCompletionRequest : BaseCompletionRequest
+public class MistralCompletionRequest : BaseCompletionRequest
+{
+    [JsonPropertyName("random_seed")]
+    public int Seed { get; set; } = Random.Shared.Next();
+    
+    [JsonPropertyName("safe_prompt")]
+    public bool SafePrompt { get; set; } = false;
+}
+
+public class OpenRouterCompletionRequest : BaseCompletionRequest
 {
     [JsonPropertyName("min_p")]
     public float? MinP { get; set; } = 0.05f;

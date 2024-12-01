@@ -174,7 +174,7 @@ public class CompletionController(
                     _httpClient.BaseAddress = new Uri("https://api.mistral.ai/");
                     _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _settings.Inference.MistralAiSettings!.ApiKey);
                     _httpClient.DefaultRequestHeaders.Add("ApiKey", _settings.Inference.MistralAiSettings!.ApiKey);
-                    var mistralAiCompletionRequest = new BaseCompletionRequest
+                    var mistralAiCompletionRequest = new MistralCompletionRequest
                     {
                         Model = _settings.Inference.MistralAiSettings!.Model,
                         Stream = _tabbyRequest.Stream,
@@ -195,7 +195,7 @@ public class CompletionController(
                     _httpClient.BaseAddress = new Uri("https://openrouter.ai");
                     _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _settings.Inference.OpenRouterSettings!.ApiKey);
                     _httpClient.DefaultRequestHeaders.Add("ApiKey", _settings.Inference.OpenRouterSettings!.ApiKey);
-                    var openRouterCompletionRequest = new OpenRouterBaseCompletionRequest
+                    var openRouterCompletionRequest = new OpenRouterCompletionRequest
                     {
                         Model = _settings.Inference.OpenRouterSettings!.Model,
                         Stream = _tabbyRequest.Stream,
