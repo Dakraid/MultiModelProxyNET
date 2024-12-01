@@ -29,9 +29,6 @@ public class BaseCompletionRequest
     [JsonPropertyName("messages")]
     public Message[] Messages { get; set; } = [];
 
-    [JsonPropertyName("stop")]
-    public List<string>? Stop { get; set; }
-
     [JsonPropertyName("stream")]
     public bool Stream { get; set; } = true;
 
@@ -49,15 +46,15 @@ public class BaseCompletionRequest
 
     [JsonPropertyName("max_tokens")]
     public int MaxTokens { get; set; } = 1024;
-
-    [JsonPropertyName("random_seed")]
-    public int RandomSeed { get; set; } = 0;
 }
 
 public class OpenRouterBaseCompletionRequest : BaseCompletionRequest
 {
     [JsonPropertyName("min_p")]
     public float? MinP { get; set; } = 0.05f;
+
+    [JsonPropertyName("seed")]
+    public int Seed { get; set; } = Random.Shared.Next();
 }
 
 public class TabbyCompletionRequest

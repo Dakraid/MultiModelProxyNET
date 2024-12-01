@@ -177,22 +177,20 @@ public class CompletionController(
                     var mistralAiCompletionRequest = new BaseCompletionRequest
                     {
                         Model = _settings.Inference.MistralAiSettings!.Model,
-                        Stop = _tabbyRequest.Stop,
                         Stream = _tabbyRequest.Stream,
                         MaxTokens = _tabbyRequest.MaxTokens,
                         Temperature = _tabbyRequest.Temperature,
                         FrequencyPenalty = _tabbyRequest.FrequencyPenalty,
                         PresencePenalty = _tabbyRequest.PresencePenalty,
                         TopP = _tabbyRequest.TopP,
-                        Messages = _extendedMessages.ToArray(),
-                        RandomSeed = Random.Shared.Next()
+                        Messages = _extendedMessages.ToArray()
                     };
 
                     proxyRequest.Content = new StringContent(JsonSerializer.Serialize(mistralAiCompletionRequest), Encoding.UTF8, "application/json");
                     break;
 
                 case Handler.OpenRouter:
-                    logger.LogInformation("Using OpeRouter as fallback.");
+                    logger.LogInformation("Using OpenRouter as fallback.");
                     proxyRequest.RequestUri = new Uri("/api/v1/chat/completions", UriKind.Relative);
                     _httpClient.BaseAddress = new Uri("https://openrouter.ai");
                     _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _settings.Inference.OpenRouterSettings!.ApiKey);
@@ -200,7 +198,6 @@ public class CompletionController(
                     var openRouterCompletionRequest = new OpenRouterBaseCompletionRequest
                     {
                         Model = _settings.Inference.OpenRouterSettings!.Model,
-                        Stop = _tabbyRequest.Stop,
                         Stream = _tabbyRequest.Stream,
                         MaxTokens = _tabbyRequest.MaxTokens,
                         Temperature = _tabbyRequest.Temperature,
@@ -208,7 +205,6 @@ public class CompletionController(
                         PresencePenalty = _tabbyRequest.PresencePenalty,
                         TopP = _tabbyRequest.TopP,
                         Messages = _extendedMessages.ToArray(),
-                        RandomSeed = Random.Shared.Next(),
                         MinP = _tabbyRequest.MinP ?? 0.05f,
                     };
 
@@ -216,9 +212,12 @@ public class CompletionController(
                     break;
 
                 case Handler.TabbyApi:
-                    _httpClient.BaseAddress = new Uri(_settings.Inference.TabbyApiSettings!.BaseUri!);
-                    break;
+                    throw new NotImplementedException("TabbyAPI fallback handler is not implemented yet.");
                 }
+            }
+            else
+            {
+                Utility.SetHeaders(_httpClient, headers);
             }
             
             if (_tabbyRequest.Stream)
