@@ -1,11 +1,13 @@
-﻿// MultiModelProxy - CompletionController.cs
+// MultiModelProxy - CompletionController.cs
 // Created on 2024.11.18
-// Last modified at 2024.11.19 13:11
+// Last modified at 2024.12.07 19:12
 
+// ReSharper disable InconsistentNaming
 namespace MultiModelProxy.Controllers;
 
-#region Usings
+#region
 using System.Buffers;
+using System.Diagnostics;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
@@ -27,17 +29,17 @@ public class CompletionController(
     ChatContext chatContext
 )
 {
-    private readonly Settings _settings = settings.Value;
     private static readonly RecyclableMemoryStreamManager _streamManager = new();
     private static readonly JsonSerializerOptions _jsonOptions = new() { PropertyNameCaseInsensitive = true, DefaultBufferSize = 4096 };
-    private bool _isAlive;
-    private HttpClient _httpClient = httpClientFactory.CreateClient("PrimaryClient");
+    private readonly Settings _settings = settings.Value;
     private CancellationToken _combinedToken = CancellationToken.None;
-    private TabbyCompletionRequest? _tabbyRequest = new();
-    private Message? _lastUserMessage = new();
-    private string _lastStoredUserMessage = string.Empty;
-    private string _lastStoredCoTMessage = string.Empty;
     private List<Message> _extendedMessages = [];
+    private HttpClient _httpClient = httpClientFactory.CreateClient("PrimaryClient");
+    private bool _isAlive;
+    private string _lastStoredCoTMessage = string.Empty;
+    private string _lastStoredUserMessage = string.Empty;
+    private Message? _lastUserMessage = new();
+    private TabbyCompletionRequest? _tabbyRequest = new();
 
     private async Task IsAliveAsync()
     {
@@ -52,13 +54,13 @@ public class CompletionController(
         {
             throw new ArgumentNullException();
         }
-        
+
         logger.LogInformation("Starting Chain of Thought generation.");
-        var watch = System.Diagnostics.Stopwatch.StartNew();
-        
+        var watch = Stopwatch.StartNew();
+
         _extendedMessages = new List<Message>(_tabbyRequest.Messages.Count + 3);
         _extendedMessages.AddRange(_tabbyRequest.Messages);
-        
+
         if (!_lastStoredUserMessage.Equals(_lastUserMessage.Content, StringComparison.OrdinalIgnoreCase) || string.IsNullOrWhiteSpace(_lastStoredCoTMessage))
         {
             var cotPrompt = _settings.Prompt!.Replace("{character}", _tabbyRequest.Character ?? "Character").Replace("{username}", _tabbyRequest.Username ?? "User");
@@ -101,7 +103,7 @@ public class CompletionController(
         var cancellationToken = context.RequestAborted;
         var forceAbortToken = new CancellationTokenSource();
         _combinedToken = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, forceAbortToken.Token).Token;
-        
+
         var request = context.Request;
         request.EnableBuffering();
 
@@ -132,22 +134,24 @@ public class CompletionController(
 
             _lastStoredUserMessage = results[0];
             _lastStoredCoTMessage = results[1];
-            
+
             await Task.WhenAll([
                 IsAliveAsync(),
                 GenerateChainOfThoughtAsync()
             ]);
-            
+
             if (_settings.Logging is { SaveFull: true, SaveCoT: true })
             {
                 chatContext.ChainOfThoughts.Add(new ChainOfThought { Content = _lastStoredCoTMessage });
                 chatContext.Chats.Add(new Chat { ChatMessages = _extendedMessages.Select(m => new DbChatMessage { Content = m.Content, Role = m.Role }).ToList() });
                 await chatContext.SaveChangesAsync(_combinedToken);
-            } else if (_settings.Logging.SaveCoT)
+            }
+            else if (_settings.Logging.SaveCoT)
             {
                 chatContext.ChainOfThoughts.Add(new ChainOfThought { Content = _lastStoredCoTMessage });
                 await chatContext.SaveChangesAsync(_combinedToken);
-            } else if (_settings.Logging.SaveFull)
+            }
+            else if (_settings.Logging.SaveFull)
             {
                 chatContext.Chats.Add(new Chat { ChatMessages = _extendedMessages.Select(m => new DbChatMessage { Content = m.Content, Role = m.Role }).ToList() });
                 await chatContext.SaveChangesAsync(_combinedToken);
@@ -205,7 +209,7 @@ public class CompletionController(
                         PresencePenalty = _tabbyRequest.PresencePenalty,
                         TopP = _tabbyRequest.TopP,
                         Messages = _extendedMessages.ToArray(),
-                        MinP = _tabbyRequest.MinP ?? 0.05f,
+                        MinP = _tabbyRequest.MinP ?? 0.05f
                     };
 
                     proxyRequest.Content = new StringContent(JsonSerializer.Serialize(openRouterCompletionRequest), Encoding.UTF8, "application/json");
@@ -219,7 +223,7 @@ public class CompletionController(
             {
                 Utility.SetHeaders(_httpClient, headers);
             }
-            
+
             if (_tabbyRequest.Stream)
             {
                 logger.LogInformation("Generating final streaming response.");
@@ -227,7 +231,7 @@ public class CompletionController(
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    logger.LogWarning("Received non-success status code {statusCode} with message \"{reason}\"", (int) response.StatusCode,  response.ReasonPhrase);
+                    logger.LogWarning("Received non-success status code {statusCode} with message \"{reason}\"", (int) response.StatusCode, response.ReasonPhrase);
                     return Results.StatusCode((int) response.StatusCode);
                 }
 

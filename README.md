@@ -1,10 +1,12 @@
 # Notice
 
-This project is in early development, I have only verified its functionality for myself, so it is not guaranteed to work for your environment i.e. non-TabbyAPI main inference endpoints.
+This project is in early development, I have only verified its functionality for myself, so it is not guaranteed to work for your environment i.e. non-TabbyAPI main inference
+endpoints.
 
 # MultiModelProxyNET
 
-This is an updated .NET 9 port of my previous MultiModelProxy, an OAI-compatible proxy server that facilitates fast Chain of Thought generation thought prompting by using a smaller model to do the CoT inference before handing it to the (larger) main model.
+This is an updated .NET 9 port of my previous MultiModelProxy, an OAI-compatible proxy server that facilitates fast Chain of Thought generation thought prompting by using a smaller
+model to do the CoT inference before handing it to the (larger) main model.
 
 # Usage
 
@@ -38,7 +40,8 @@ docker run -d \
 
 # License
 
-This project is licensed under AGPLv3.0 (see included LICENSE file). 
+This project is licensed under AGPLv3.0 (see included LICENSE file).
 
-The following clause applies on top of it and overrides any conflicting clauses: **This project may not be used in a commercial context under any circumstance unless a commercial license has been granted by the owner. This stipulation applies on top of the
+The following clause applies on top of it and overrides any conflicting clauses: **This project may not be used in a commercial context under any circumstance unless a commercial
+license has been granted by the owner. This stipulation applies on top of the
 AGPLv3 license.**

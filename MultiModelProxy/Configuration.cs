@@ -1,10 +1,8 @@
-﻿// MultiModelProxy - Configuration.cs
+// MultiModelProxy - Configuration.cs
 // Created on 2024.11.18
-// Last modified at 2024.11.19 13:11
+// Last modified at 2024.12.07 19:12
 
 namespace MultiModelProxy;
-
-using Models;
 
 public enum Handler { TabbyApi, MistralAi, OpenRouter }
 

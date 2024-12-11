@@ -1,10 +1,10 @@
 ﻿// MultiModelProxy - Utility.cs
 // Created on 2024.11.18
-// Last modified at 2024.11.19 13:11
+// Last modified at 2024.12.07 19:12
 
 namespace MultiModelProxy;
 
-#region Usings
+#region
 using System.Net.Http.Headers;
 #endregion
 
@@ -12,7 +12,8 @@ public static class Utility
 {
     public static async ValueTask<bool> IsAliveAsync(HttpClient httpClient)
     {
-        try {
+        try
+        {
             var result = await httpClient.GetAsync("/health");
             return result.IsSuccessStatusCode;
         }

@@ -1,11 +1,10 @@
 ﻿// MultiModelProxy - ThoughtController.cs
 // Created on 2024.11.24
-// Last modified at 2024.11.24 23:11
+// Last modified at 2024.12.07 19:12
 
 namespace MultiModelProxy.Controllers;
 
-#region Usings
-using System.Text.Json;
+#region
 using Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;

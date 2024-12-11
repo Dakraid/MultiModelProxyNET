@@ -1,10 +1,10 @@
 ﻿// MultiModelProxy - TabbyCompletionRequest.cs
 // Created on 2024.11.18
-// Last modified at 2024.11.19 13:11
+// Last modified at 2024.12.07 19:12
 
 namespace MultiModelProxy.Models;
 
-#region Usings
+#region
 using System.Text.Json.Serialization;
 #endregion
 
@@ -52,7 +52,7 @@ public class MistralCompletionRequest : BaseCompletionRequest
 {
     [JsonPropertyName("random_seed")]
     public int Seed { get; set; } = Random.Shared.Next();
-    
+
     [JsonPropertyName("safe_prompt")]
     public bool SafePrompt { get; set; } = false;
 }
@@ -70,7 +70,7 @@ public class TabbyCompletionRequest
 {
     [JsonPropertyName("messages")]
     public List<Message>? Messages { get; set; }
-    
+
     [JsonPropertyName("stop")]
     public List<string>? Stop { get; set; }
 

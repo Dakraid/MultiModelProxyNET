@@ -1,18 +1,16 @@
 // MultiModelProxy - Program.cs
 // Created on 2024.11.18
-// Last modified at 2024.11.19 13:11
+// Last modified at 2024.12.07 19:12
 
 namespace MultiModelProxy;
 
-#region Usings
+#region
 using System.ClientModel;
 using Context;
 using Controllers;
 using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.AspNetCore.Routing.Constraints;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
-using Mistral.SDK;
 using OpenAI;
 using OpenAI.Chat;
 #endregion
@@ -55,6 +53,7 @@ public class Program
                 Console.WriteLine("BaseUri, ApiKey or Model is not set in TabbyApiSettings in appsettings.json");
                 return false;
             }
+
             break;
 
         case Handler.MistralAi:
@@ -64,12 +63,12 @@ public class Program
                 return false;
             }
 
-            if (string.IsNullOrWhiteSpace(settings.Inference.MistralAiSettings.ApiKey)
-                || string.IsNullOrWhiteSpace(settings.Inference.MistralAiSettings.Model))
+            if (string.IsNullOrWhiteSpace(settings.Inference.MistralAiSettings.ApiKey) || string.IsNullOrWhiteSpace(settings.Inference.MistralAiSettings.Model))
             {
                 Console.WriteLine("ApiKey or Model is not set in MistralAiSettings in appsettings.json");
                 return false;
             }
+
             break;
 
         case Handler.OpenRouter:
@@ -84,6 +83,7 @@ public class Program
                 Console.WriteLine("ApiKey or Model is not set in OpenRouterSettings in appsettings.json");
                 return false;
             }
+
             break;
 
         default:
@@ -92,14 +92,14 @@ public class Program
 
         return true;
     }
-    
+
     public static void Main(string[] args)
     {
         var builder = WebApplication.CreateSlimBuilder(args);
 
         builder.Services.Configure<RouteOptions>(options => options.SetParameterPolicy<RegexInlineRouteConstraint>("regex"));
         builder.Services.Configure<Settings>(builder.Configuration.GetSection("Settings"));
-        
+
         var settings = builder.Configuration.GetSection("Settings").Get<Settings>();
         if (!IsValidConfiguration(settings))
         {
@@ -167,7 +167,7 @@ public class Program
 
         // Thoughts
         app.MapGet("/v1/thought", async (HttpContext context, ThoughtController controller) => await controller.GetLastThoughtAsync(context));
-        
+
         // Generic Proxy Endpoints
         app.MapGet("/{*path}", async (HttpContext context, GenericProxyController controller, string path) => await controller.GenericGetAsync(context, path));
         app.MapPost("/{*path}", async (HttpContext context, GenericProxyController controller, string path) => await controller.GenericPostAsync(context, path));

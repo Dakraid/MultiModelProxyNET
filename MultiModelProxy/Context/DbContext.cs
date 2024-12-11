@@ -1,10 +1,10 @@
 ﻿// MultiModelProxy - DbContext.cs
 // Created on 2024.11.19
-// Last modified at 2024.11.19 13:11
+// Last modified at 2024.12.07 19:12
 
 namespace MultiModelProxy.Context;
 
-#region Usings
+#region
 using Microsoft.EntityFrameworkCore;
 using Models;
 #endregion
