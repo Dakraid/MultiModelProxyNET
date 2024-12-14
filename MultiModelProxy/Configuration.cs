@@ -8,11 +8,10 @@ public enum Handler { TabbyApi, MistralAi, OpenRouter }
 
 public class Settings
 {
-    public string? ApiKey { get; set; }
-    public string? Prompt { get; set; }
+    public required string ApiKey { get; set; }
+    public required string Prompt { get; set; }
     public string Prefill { get; set; } = "[Continue.]";
     public string Postfill { get; set; } = "[Write the next reply as instructed, taking the thoughts in the chain_of_thought block into account.]";
-    public bool SillyTavernExtension { get; set; }
     public LoggingSettings Logging { get; set; } = new();
     public InferenceSettings Inference { get; set; } = new();
 }

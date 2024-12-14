@@ -5,6 +5,7 @@
 namespace MultiModelProxy.Controllers;
 
 #region
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
@@ -14,20 +15,48 @@ using Models;
 public class GenericProxyController(ILogger<GenericProxyController> logger, IOptions<Settings> settings, IHttpClientFactory httpClientFactory)
 {
     private readonly Settings _settings = settings.Value;
+    private static readonly JsonSerializerOptions _jsonOptions = new() { PropertyNameCaseInsensitive = true, DefaultBufferSize = 4096 };
+
+    private async Task<bool> IsAliveAsync()
+    {
+        using var httpClient = httpClientFactory.CreateClient("PrimaryClient");
+        httpClient.Timeout = TimeSpan.FromSeconds(5);
+        return await Utility.IsAliveAsync(httpClient).ConfigureAwait(false);
+    }
 
     public async Task<IResult> GenericGetAsync(HttpContext context, string path)
     {
         var httpClient = httpClientFactory.CreateClient("PrimaryClient");
         var headers = context.Request.Headers;
         logger.LogInformation("GenericGet was called at: {path}", path);
-
-        Utility.SetHeaders(httpClient, headers);
-
-        var isAliveTask = Utility.IsAliveAsync(httpClient);
-        if (!await isAliveTask)
+        
+        var isAlive = await IsAliveAsync();
+        if (!isAlive && _settings.Inference.UseFallback)
         {
-            logger.LogError("Primary inference endpoint is offline.");
-            return _settings.Inference.UseFallback ? Results.Ok() : Results.InternalServerError();
+            logger.LogInformation("Primary inference endpoint offline and fallback enabled, switching to fallback endpoint.");
+            switch (_settings.Inference.CotHandler)
+            {
+            case Handler.MistralAi:
+                logger.LogInformation("Using Mistral AI as fallback.");
+                httpClient.BaseAddress = new Uri("https://api.mistral.ai/");
+                httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _settings.Inference.MistralAiSettings!.ApiKey);
+                httpClient.DefaultRequestHeaders.Add("ApiKey", _settings.Inference.MistralAiSettings!.ApiKey);
+                break;
+
+            case Handler.OpenRouter:
+                logger.LogInformation("Using OpenRouter as fallback.");
+                httpClient.BaseAddress = new Uri("https://openrouter.ai/api/");
+                httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _settings.Inference.OpenRouterSettings!.ApiKey);
+                httpClient.DefaultRequestHeaders.Add("ApiKey", _settings.Inference.OpenRouterSettings!.ApiKey);
+                break;
+
+            case Handler.TabbyApi:
+                throw new NotImplementedException("TabbyAPI fallback handler is not implemented yet.");
+            }
+        }
+        else
+        {
+            Utility.SetHeaders(httpClient, headers);
         }
 
         var response = await httpClient.GetAsync(path);
@@ -43,14 +72,33 @@ public class GenericProxyController(ILogger<GenericProxyController> logger, IOpt
         var request = context.Request;
         logger.LogInformation("GenericPost was called at: {path}", path);
 
-        Utility.SetHeaders(httpClient, headers);
-
-        var isAliveTask = Utility.IsAliveAsync(httpClient);
-        if (!await isAliveTask)
+        var isAlive = await IsAliveAsync();
+        if (!isAlive && _settings.Inference.UseFallback)
         {
-            logger.LogError("Primary inference endpoint is offline.");
+            logger.LogInformation("Primary inference endpoint offline and fallback enabled, switching to fallback endpoint.");
+            switch (_settings.Inference.CotHandler)
+            {
+            case Handler.MistralAi:
+                logger.LogInformation("Using Mistral AI as fallback.");
+                httpClient.BaseAddress = new Uri("https://api.mistral.ai/");
+                httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _settings.Inference.MistralAiSettings!.ApiKey);
+                httpClient.DefaultRequestHeaders.Add("ApiKey", _settings.Inference.MistralAiSettings!.ApiKey);
+                break;
 
-            return _settings.Inference.UseFallback ? Results.Ok() : Results.InternalServerError();
+            case Handler.OpenRouter:
+                logger.LogInformation("Using OpenRouter as fallback.");
+                httpClient.BaseAddress = new Uri("https://openrouter.ai/api/");
+                httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _settings.Inference.OpenRouterSettings!.ApiKey);
+                httpClient.DefaultRequestHeaders.Add("ApiKey", _settings.Inference.OpenRouterSettings!.ApiKey);
+                break;
+
+            case Handler.TabbyApi:
+                throw new NotImplementedException("TabbyAPI fallback handler is not implemented yet.");
+            }
+        }
+        else
+        {
+            Utility.SetHeaders(httpClient, headers);
         }
 
         request.EnableBuffering();
@@ -59,7 +107,7 @@ public class GenericProxyController(ILogger<GenericProxyController> logger, IOpt
 
         request.Body.Position = 0;
 
-        var tabbyRequest = JsonSerializer.Deserialize<TabbyCompletionRequest>(body, TabbyCompletionRequestContext.Default.TabbyCompletionRequest);
+        var tabbyRequest = JsonSerializer.Deserialize<BaseCompletionRequest>(body, _jsonOptions);
 
         if (tabbyRequest == null)
         {
