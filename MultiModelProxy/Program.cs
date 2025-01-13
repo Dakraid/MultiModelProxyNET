@@ -2,6 +2,7 @@
 // Created on 2024.11.18
 // Last modified at 2024.12.07 19:12
 
+// ReSharper disable ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
 namespace MultiModelProxy;
 
 #region
@@ -13,6 +14,7 @@ using Microsoft.AspNetCore.Routing.Constraints;
 using Microsoft.EntityFrameworkCore;
 using OpenAI;
 using OpenAI.Chat;
+using Services;
 #endregion
 
 public class Program
@@ -21,76 +23,76 @@ public class Program
     {
         if (settings == null)
         {
-            Console.WriteLine("Settings section not found in appsettings.json");
             return false;
         }
 
-        if (settings.ApiKey == null || settings.Prompt == null)
+        // Validate required fields
+        if (string.IsNullOrWhiteSpace(settings.ApiKey) || string.IsNullOrWhiteSpace(settings.Prompt))
         {
-            Console.WriteLine("ApiKey or Prompt is not set in appsettings.json");
             return false;
         }
 
-        if (settings.Inference.PrimaryEndpoint == null)
+        // Validate LoggingSettings
+        if (settings.Logging == null)
         {
-            Console.WriteLine("PrimaryEndpoint is not set in appsettings.json");
             return false;
         }
 
+        // Validate InferenceSettings
+        if (settings.Inference == null)
+        {
+            return false;
+        }
+
+        // Validate PrimaryEndpoint
+        if (string.IsNullOrWhiteSpace(settings.Inference.PrimaryEndpoint))
+        {
+            return false;
+        }
+        
+        // Validate CotRotation
+        if (settings.Inference.CoTRotation < 0)
+        {
+            return false;
+        }
+
+        // Validate Handler-specific settings
         switch (settings.Inference.CotHandler)
         {
-        case Handler.TabbyApi:
-            if (settings.Inference.TabbyApiSettings == null)
-            {
-                Console.WriteLine("TabbyApiSettings is not set in appsettings.json");
+            case Handler.MistralAi:
+                if (settings.Inference.MistralAiSettings == null ||
+                    string.IsNullOrWhiteSpace(settings.Inference.MistralAiSettings.ApiKey) ||
+                    string.IsNullOrWhiteSpace(settings.Inference.MistralAiSettings.Model))
+                {
+                    return false;
+                }
+                break;
+
+            case Handler.TabbyApi:
+                if (settings.Inference.TabbyApiSettings == null ||
+                    string.IsNullOrWhiteSpace(settings.Inference.TabbyApiSettings.BaseUri) ||
+                    string.IsNullOrWhiteSpace(settings.Inference.TabbyApiSettings.ApiKey) ||
+                    string.IsNullOrWhiteSpace(settings.Inference.TabbyApiSettings.Model))
+                {
+                    return false;
+                }
+                break;
+
+            case Handler.OpenRouter:
+                if (settings.Inference.OpenRouterSettings == null ||
+                    string.IsNullOrWhiteSpace(settings.Inference.OpenRouterSettings.ApiKey) ||
+                    string.IsNullOrWhiteSpace(settings.Inference.OpenRouterSettings.Model))
+                {
+                    return false;
+                }
+                break;
+
+            default:
                 return false;
-            }
-
-            if (string.IsNullOrWhiteSpace(settings.Inference.TabbyApiSettings.BaseUri)
-                || string.IsNullOrWhiteSpace(settings.Inference.TabbyApiSettings.ApiKey)
-                || string.IsNullOrWhiteSpace(settings.Inference.TabbyApiSettings.Model))
-            {
-                Console.WriteLine("BaseUri, ApiKey or Model is not set in TabbyApiSettings in appsettings.json");
-                return false;
-            }
-
-            break;
-
-        case Handler.MistralAi:
-            if (settings.Inference.MistralAiSettings == null)
-            {
-                Console.WriteLine("MistralAiSettings is not set in appsettings.json");
-                return false;
-            }
-
-            if (string.IsNullOrWhiteSpace(settings.Inference.MistralAiSettings.ApiKey) || string.IsNullOrWhiteSpace(settings.Inference.MistralAiSettings.Model))
-            {
-                Console.WriteLine("ApiKey or Model is not set in MistralAiSettings in appsettings.json");
-                return false;
-            }
-
-            break;
-
-        case Handler.OpenRouter:
-            if (settings.Inference.OpenRouterSettings == null)
-            {
-                Console.WriteLine("OpenRouterSettings is not set in appsettings.json");
-                return false;
-            }
-
-            if (string.IsNullOrWhiteSpace(settings.Inference.OpenRouterSettings.ApiKey) || string.IsNullOrWhiteSpace(settings.Inference.OpenRouterSettings.Model))
-            {
-                Console.WriteLine("ApiKey or Model is not set in OpenRouterSettings in appsettings.json");
-                return false;
-            }
-
-            break;
-
-        default:
-            return false;
         }
 
-        return true;
+        // Validate FallbackModel
+        return settings.Inference.FallbackModel != null && settings.Inference.FallbackModel.Length != 0;
     }
 
     public static void Main(string[] args)
@@ -134,6 +136,7 @@ public class Program
             break;
         }
 
+        builder.Services.AddSingleton<ITrackerService, TrackerService>();
         builder.Services.AddScoped<GenericProxyController>();
         builder.Services.AddScoped<CompletionController>();
         builder.Services.AddScoped<ThoughtController>();

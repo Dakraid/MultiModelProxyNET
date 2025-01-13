@@ -73,12 +73,24 @@ public class ExtensionSettings
     [JsonPropertyName("cot_prompt")]
     public string? CotPrompt { get; set; }
 
-    // [JsonPropertyName("cot_min_messages")]
-    // public int? MinMessages { get; set; }
+    [JsonPropertyName("cot_rotation")]
+    public int CotRotation { get; set; }
 
     [JsonPropertyName("model")]
     public string? Model { get; set; }
 
     [JsonPropertyName("handler")]
     public Handler Handler { get; set; }
+
+    [JsonPropertyName("use_fallback")]
+    public bool UseFallback { get; set; } = true;
+
+    [JsonPropertyName("fallback_handler")]
+    public string? FallbackHandler { get; set; }
+
+    [JsonPropertyName("fallback_model")]
+    public string[]? FallbackModel { get; set; }
+
+    [JsonPropertyName("fallback_rotation")]
+    public int FallbackRotation { get; set; }
 }
