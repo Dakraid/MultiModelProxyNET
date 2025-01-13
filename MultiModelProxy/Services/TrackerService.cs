@@ -7,7 +7,7 @@ namespace MultiModelProxy.Services;
 public interface ITrackerService
 {
     void IncrementCoTRound();
-    int IncrementResponseRound();
+    void IncrementResponseRound();
     void ResetCoTRound();
     void ResetResponseRound();
     int GetCoTRound();
@@ -27,7 +27,7 @@ public class TrackerService : ITrackerService
 
     public void IncrementCoTRound() => Interlocked.Increment(ref _coTRound);
 
-    public int IncrementResponseRound() => Interlocked.Increment(ref _responseRound);
+    public void IncrementResponseRound() => Interlocked.Increment(ref _responseRound);
 
     public void ResetCoTRound() => _coTRound = 0;
     

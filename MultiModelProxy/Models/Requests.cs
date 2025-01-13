@@ -74,23 +74,26 @@ public class ExtensionSettings
     public string? CotPrompt { get; set; }
 
     [JsonPropertyName("cot_rotation")]
-    public int CotRotation { get; set; }
+    public int? CotRotation { get; set; }
+
+    [JsonPropertyName("force_cot")]
+    public bool? ForceCoT { get; set; }
 
     [JsonPropertyName("model")]
     public string? Model { get; set; }
 
     [JsonPropertyName("handler")]
-    public Handler Handler { get; set; }
+    public Handler? Handler { get; set; }
 
     [JsonPropertyName("use_fallback")]
-    public bool UseFallback { get; set; } = true;
+    public bool? UseFallback { get; set; } = true;
 
     [JsonPropertyName("fallback_handler")]
-    public string? FallbackHandler { get; set; }
+    public Handler? FallbackHandler { get; set; }
 
     [JsonPropertyName("fallback_model")]
     public string[]? FallbackModel { get; set; }
 
     [JsonPropertyName("fallback_rotation")]
-    public int FallbackRotation { get; set; }
+    public int? FallbackRotation { get; set; }
 }

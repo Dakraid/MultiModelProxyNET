@@ -77,14 +77,48 @@ public class CompletionController(
         await chatContext.SaveChangesAsync(_combinedToken);
     }
 
+    private void OverwriteSettings()
+    {
+        if (_extensionSettings == null)
+        {
+            return;
+        }
+
+        if (_extensionSettings.ForceCoT.HasValue)
+        {
+            _settings.Inference.ForceCoT = _extensionSettings.ForceCoT.Value;
+        }
+
+        if (_extensionSettings.CotRotation.HasValue)
+        {
+            _settings.Inference.CoTRotation = _extensionSettings.CotRotation.Value;
+        }
+
+        if (!string.IsNullOrWhiteSpace(_extensionSettings.CotPrompt))
+        {
+            _settings.Prompt = _extensionSettings.CotPrompt;
+        }
+
+        if (_extensionSettings.FallbackHandler.HasValue)
+        {
+            _settings.Inference.FallbackHandler = _extensionSettings.FallbackHandler.Value;
+        }
+
+        if (_extensionSettings.FallbackModel is { Length: > 0 })
+        {
+            _settings.Inference.FallbackModel = _extensionSettings.FallbackModel;
+        }
+    }
+
     private async ValueTask<bool> GenerateChainOfThoughtAsync()
     {
         logger.LogInformation("Starting Chain of Thought generation.");
         var watch = Stopwatch.StartNew();
 
+        var forceCoT = _settings.Inference.ForceCoT;
         var newUserMessage = !trackerService.GetLastUserMessage().Equals(_lastUserMessage!.Content, StringComparison.OrdinalIgnoreCase);
         var emptyCoT = string.IsNullOrWhiteSpace(trackerService.GetLastCotMessage());
-        var cotRounds = _extensionSettings!.CotRotation != 0 ? _extensionSettings!.CotRotation : _settings.Inference.CoTRotation;
+        var cotRounds = _settings.Inference.CoTRotation;
         var newRound = cotRounds == 0 || trackerService.GetCoTRound() >= cotRounds;
         
         if (newUserMessage)
@@ -102,7 +136,7 @@ public class CompletionController(
 
         logger.LogInformation("CoT rotation currently: {curr}/{limit}", trackerService.GetCoTRound(), cotRounds);
 
-        if ((newRound && newUserMessage) || emptyCoT)
+        if ((newRound && newUserMessage) || emptyCoT || forceCoT)
         {
             var chatMessages = _completionRequest!.Messages.Select<Message, ChatMessage>(message => message.Role.ToLowerInvariant() switch
             {
@@ -112,7 +146,7 @@ public class CompletionController(
                 _ => throw new ArgumentException($"Invalid role: {message.Role}")
             }).ToList();
 
-            var templatePrompt = string.IsNullOrWhiteSpace(_extensionSettings!.CotPrompt) ? _settings.Prompt : _extensionSettings.CotPrompt!;
+            var templatePrompt = _settings.Prompt;
             var cotPrompt = templatePrompt.Replace("{character}", _extensionSettings!.Character ?? "Character").Replace("{username}", _extensionSettings!.Username ?? "User");
             chatMessages.Add(ChatMessage.CreateUserMessage(cotPrompt));
 
@@ -194,6 +228,8 @@ public class CompletionController(
                 return Results.InternalServerError();
             }
 
+            OverwriteSettings();
+
             _isAlive = await IsAliveAsync();
             var generatedThought = await GenerateChainOfThoughtAsync();
             if (!generatedThought)
@@ -213,9 +249,9 @@ public class CompletionController(
                 logger.LogInformation("Primary inference endpoint offline and fallback enabled, switching to fallback endpoint.");
 
                 var round = trackerService.GetResponseRound();
-                var model = _extensionSettings!.FallbackModel?.Length > 1 ? _extensionSettings!.FallbackModel[round] : _settings.Inference.FallbackModel[round];
+                var model = _settings.Inference.FallbackModel[round];
                 logger.LogInformation("Selected model: {model}", model);
-                var limit = _extensionSettings!.FallbackModel?.Length > 1 ? _extensionSettings!.FallbackModel?.Length - 1 : _settings.Inference.FallbackModel.Length - 1;
+                var limit = _settings.Inference.FallbackModel.Length - 1;
                 if (round >= limit)
                 {
                     trackerService.ResetResponseRound();
@@ -225,6 +261,8 @@ public class CompletionController(
                 {
                     trackerService.IncrementResponseRound();
                 }
+
+                logger.LogInformation("Response rotation currently: {curr}/{limit}", trackerService.GetResponseRound(), limit);
 
                 _completionRequest.Model = model;
 
@@ -247,6 +285,9 @@ public class CompletionController(
 
                     case Handler.TabbyApi:
                         throw new NotImplementedException("TabbyAPI fallback handler is not implemented yet.");
+                    
+                    default:
+                        throw new ArgumentException("Unknown fallback handler provided.");
                 }
             }
             else

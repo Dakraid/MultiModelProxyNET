@@ -27,6 +27,7 @@ public class InferenceSettings
     public string? PrimaryEndpoint { get; set; }
     public Handler CotHandler { get; set; } = Handler.MistralAi;
     public int CoTRotation { get; set; } = 0;
+    public bool ForceCoT { get; set; }
     public EndpointSettings? TabbyApiSettings { get; set; }
     public EndpointSettings? MistralAiSettings { get; set; }
     public EndpointSettings? OpenRouterSettings { get; set; }
