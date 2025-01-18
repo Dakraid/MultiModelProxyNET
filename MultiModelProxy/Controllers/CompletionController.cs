@@ -12,6 +12,7 @@ using System.Diagnostics;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Context;
 using Microsoft.Extensions.Options;
 using Models;
@@ -21,7 +22,7 @@ using ChatMessage = OpenAI.Chat.ChatMessage;
 using DbChatMessage = Models.ChatMessage;
 #endregion
 
-public class CompletionController(
+public partial class CompletionController(
     ILogger<CompletionController> logger,
     IOptions<Settings> settings,
     IHttpClientFactory httpClientFactory,
@@ -259,6 +260,15 @@ public class CompletionController(
 
                 var round = trackerService.GetResponseRound();
                 var model = _settings.Inference.FallbackModel[round];
+                var overwrite = _completionRequest!.Messages.LastOrDefault(m => m.Content.Contains("<model:"));
+                if (overwrite != null)
+                {
+                    var match = ModelRegex().Match(overwrite.Content);
+                    if (match.Success)
+                    {
+                        model = match.Groups[1].Value;
+                    }
+                }
                 logger.LogInformation("Selected model: {model}", model);
                 var limit = _settings.Inference.FallbackModel.Length - 1;
                 if (round >= limit)
@@ -346,4 +356,7 @@ public class CompletionController(
             ArrayPool<byte>.Shared.Return(buffer);
         }
     }
+
+    [GeneratedRegex("<model:(.*)>", RegexOptions.Multiline)]
+    private static partial Regex ModelRegex();
 }
