@@ -222,24 +222,33 @@ public class CompletionController(
                 return Results.InternalServerError();
             }
 
-            _lastUserMessage = _completionRequest!.Messages.LastOrDefault(m => m.Role.Equals("User", StringComparison.OrdinalIgnoreCase));
-            if (_lastUserMessage == null)
+            if (_completionRequest!.Messages.LastOrDefault(m => m.Content.Contains("<flag:skip>")) != null)
             {
-                return Results.InternalServerError();
+                OverwriteSettings();
+
+                _isAlive = await IsAliveAsync();
             }
-
-            OverwriteSettings();
-
-            _isAlive = await IsAliveAsync();
-            var generatedThought = await GenerateChainOfThoughtAsync();
-            if (!generatedThought)
+            else
             {
-                return Results.InternalServerError();
-            }
-            
-            await ExecuteLoggingAsync();
+                _lastUserMessage = _completionRequest!.Messages.LastOrDefault(m => m.Role.Equals("User", StringComparison.OrdinalIgnoreCase));
+                if (_lastUserMessage == null)
+                {
+                    return Results.InternalServerError();
+                }
 
-            _completionRequest.Messages = _extendedMessages;
+                OverwriteSettings();
+
+                _isAlive = await IsAliveAsync();
+                var generatedThought = await GenerateChainOfThoughtAsync();
+                if (!generatedThought)
+                {
+                    return Results.InternalServerError();
+                }
+
+                await ExecuteLoggingAsync();
+
+                _completionRequest.Messages = _extendedMessages;
+            }
 
             using var proxyRequest = new HttpRequestMessage(HttpMethod.Post, "/v1/chat/completions");
 
