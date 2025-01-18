@@ -223,8 +223,10 @@ public partial class CompletionController(
                 return Results.InternalServerError();
             }
 
-            if (_completionRequest!.Messages.LastOrDefault(m => m.Content.Contains("<flag:skip>")) != null)
+            var skipFlagMessage = _completionRequest!.Messages.LastOrDefault(m => m.Content.Contains("<flag:skip>"));
+            if (skipFlagMessage != null)
             {
+                skipFlagMessage.Content = skipFlagMessage.Content.Replace("<flag:skip>", "");
                 OverwriteSettings();
 
                 _isAlive = await IsAliveAsync();
@@ -267,6 +269,7 @@ public partial class CompletionController(
                     if (match.Success)
                     {
                         model = match.Groups[1].Value;
+                        overwrite.Content = ModelRegex().Replace(overwrite.Content, "");
                     }
                 }
                 logger.LogInformation("Selected model: {model}", model);
