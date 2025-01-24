@@ -261,6 +261,11 @@ public partial class CompletionController(
                 logger.LogInformation("Primary inference endpoint offline and fallback enabled, switching to fallback endpoint.");
 
                 var round = trackerService.GetResponseRound();
+                if (round > _settings.Inference.FallbackModel.Length - 1)
+                {
+                    trackerService.ResetResponseRound();
+                    round = 0;
+                }
                 var model = _settings.Inference.FallbackModel[round];
                 var overwrite = _completionRequest!.Messages.LastOrDefault(m => m.Content.Contains("<model:"));
                 if (overwrite != null)
