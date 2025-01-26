@@ -4,7 +4,7 @@
 
 namespace MultiModelProxy;
 
-public enum Handler { TabbyApi, MistralAi, OpenRouter }
+public enum Handler { TabbyApi, MistralAi, OpenRouter, DeepSeek }
 
 public class Settings
 {
@@ -31,6 +31,7 @@ public class InferenceSettings
     public EndpointSettings? TabbyApiSettings { get; set; }
     public EndpointSettings? MistralAiSettings { get; set; }
     public EndpointSettings? OpenRouterSettings { get; set; }
+    public EndpointSettings? DeepSeekSettings { get; set; }
     public bool UseFallback { get; set; } = true;
     public Handler FallbackHandler { get; set; } = Handler.MistralAi;
     public string[] FallbackModel { get; set; } = [];

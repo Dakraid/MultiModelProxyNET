@@ -1,6 +1,6 @@
 // MultiModelProxy - CompletionController.cs
 // Created on 2024.11.18
-// Last modified at 2025.01.13 12:01
+// Last modified at 2025.01.26 20:01
 
 // ReSharper disable InconsistentNaming
 
@@ -9,6 +9,7 @@ namespace MultiModelProxy.Controllers;
 #region
 using System.Buffers;
 using System.Diagnostics;
+using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
@@ -34,9 +35,10 @@ public partial class CompletionController(
     private static readonly JsonSerializerOptions _jsonOptions = new() { PropertyNameCaseInsensitive = true, DefaultBufferSize = 4096 };
     private readonly Settings _settings = settings.Value;
     private CancellationToken _combinedToken = CancellationToken.None;
-    private BaseCompletionRequest? _completionRequest;
+    private MinimalCompletionRequest? _completionRequest;
     private Message[] _extendedMessages = [];
     private ExtensionSettings? _extensionSettings;
+    private MinimalCompletionRequest? _fallbackCompletionRequest;
     private HttpClient _httpClient = httpClientFactory.CreateClient("PrimaryClient");
     private bool _isAlive;
     private Message? _lastUserMessage;
@@ -121,7 +123,7 @@ public partial class CompletionController(
         var emptyCoT = string.IsNullOrWhiteSpace(trackerService.GetLastCotMessage());
         var cotRounds = _settings.Inference.CoTRotation;
         var newRound = cotRounds == 0 || trackerService.GetCoTRound() >= cotRounds;
-        
+
         if (newUserMessage)
         {
             if (newRound)
@@ -163,6 +165,7 @@ public partial class CompletionController(
                 {
                     logger.LogError("Received no content from the chat completion. Content Object: {content}", cotResponse.Content);
                 }
+
                 watch.Stop();
                 return false;
             }
@@ -213,9 +216,20 @@ public partial class CompletionController(
             {
                 Handler.MistralAi => JsonSerializer.Deserialize<MistralCompletionRequest>(body, _jsonOptions),
                 Handler.OpenRouter => JsonSerializer.Deserialize<OpenRouterCompletionRequest>(body, _jsonOptions),
+                Handler.DeepSeek => JsonSerializer.Deserialize<MinimalCompletionRequest>(body, _jsonOptions),
                 Handler.TabbyApi => throw new NotImplementedException("TabbyAPI fallback handler is not implemented yet."),
                 _ => JsonSerializer.Deserialize<BaseCompletionRequest>(body, _jsonOptions)
             };
+
+            _fallbackCompletionRequest = _settings.Inference.FallbackHandler switch
+            {
+                Handler.MistralAi => JsonSerializer.Deserialize<MistralCompletionRequest>(body, _jsonOptions),
+                Handler.OpenRouter => JsonSerializer.Deserialize<OpenRouterCompletionRequest>(body, _jsonOptions),
+                Handler.DeepSeek => JsonSerializer.Deserialize<MinimalCompletionRequest>(body, _jsonOptions),
+                Handler.TabbyApi => throw new NotImplementedException("TabbyAPI fallback handler is not implemented yet."),
+                _ => JsonSerializer.Deserialize<BaseCompletionRequest>(body, _jsonOptions)
+            };
+
             _extensionSettings = JsonSerializer.Deserialize<ExtensionSettings>(body, _jsonOptions);
 
             if (!IsValidRequest())
@@ -266,6 +280,7 @@ public partial class CompletionController(
                     trackerService.ResetResponseRound();
                     round = 0;
                 }
+
                 var model = _settings.Inference.FallbackModel[round];
                 var overwrite = _completionRequest!.Messages.LastOrDefault(m => m.Content.Contains("<model:"));
                 if (overwrite != null)
@@ -277,6 +292,7 @@ public partial class CompletionController(
                         overwrite.Content = ModelRegex().Replace(overwrite.Content, "");
                     }
                 }
+
                 logger.LogInformation("Selected model: {model}", model);
                 var limit = _settings.Inference.FallbackModel.Length - 1;
                 if (round >= limit)
@@ -295,26 +311,34 @@ public partial class CompletionController(
 
                 switch (_settings.Inference.FallbackHandler)
                 {
-                    case Handler.MistralAi:
-                        logger.LogInformation("Using Mistral AI as fallback.");
-                        _httpClient.BaseAddress = new Uri("https://api.mistral.ai/");
-                        _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _settings.Inference.MistralAiSettings!.ApiKey);
-                        _httpClient.DefaultRequestHeaders.Add("ApiKey", _settings.Inference.MistralAiSettings!.ApiKey);
-                        break;
+                case Handler.MistralAi:
+                    logger.LogInformation("Using Mistral AI as fallback.");
+                    _httpClient.BaseAddress = new Uri("https://api.mistral.ai/");
+                    _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _settings.Inference.MistralAiSettings!.ApiKey);
+                    break;
 
-                    case Handler.OpenRouter:
-                        logger.LogInformation("Using OpenRouter as fallback.");
-                        proxyRequest.RequestUri = new Uri("/api/v1/chat/completions", UriKind.Relative);
-                        _httpClient.BaseAddress = new Uri("https://openrouter.ai/");
-                        _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _settings.Inference.OpenRouterSettings!.ApiKey);
-                        _httpClient.DefaultRequestHeaders.Add("ApiKey", _settings.Inference.OpenRouterSettings!.ApiKey);
-                        break;
+                case Handler.OpenRouter:
+                    logger.LogInformation("Using OpenRouter as fallback.");
+                    proxyRequest.RequestUri = new Uri("/api/v1/chat/completions", UriKind.Relative);
+                    _httpClient.BaseAddress = new Uri("https://openrouter.ai/");
+                    _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _settings.Inference.OpenRouterSettings!.ApiKey);
+                    _httpClient.Timeout = TimeSpan.FromSeconds(600);
+                    break;
 
-                    case Handler.TabbyApi:
-                        throw new NotImplementedException("TabbyAPI fallback handler is not implemented yet.");
-                    
-                    default:
-                        throw new ArgumentException("Unknown fallback handler provided.");
+                case Handler.DeepSeek:
+                    logger.LogInformation("Using DeepSeek as fallback.");
+                    proxyRequest.RequestUri = new Uri("/chat/completions", UriKind.Relative);
+                    _httpClient.BaseAddress = new Uri("https://api.deepseek.com");
+                    _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _settings.Inference.DeepSeekSettings!.ApiKey);
+                    _httpClient.DefaultRequestHeaders.TransferEncodingChunked = false;
+                    _httpClient.Timeout = TimeSpan.FromSeconds(600);
+                    break;
+
+                case Handler.TabbyApi:
+                    throw new NotImplementedException("TabbyAPI fallback handler is not implemented yet.");
+
+                default:
+                    throw new ArgumentException("Unknown fallback handler provided.");
                 }
             }
             else
@@ -322,7 +346,15 @@ public partial class CompletionController(
                 Utility.SetHeaders(_httpClient, headers);
             }
 
-            proxyRequest.Content = new StringContent(JsonSerializer.Serialize(_completionRequest), Encoding.UTF8, "application/json");
+            if (!_isAlive && _settings.Inference.UseFallback && _fallbackCompletionRequest != null)
+            {
+                _fallbackCompletionRequest.Model = _completionRequest.Model;
+                proxyRequest.Content = new StringContent(JsonSerializer.Serialize(_fallbackCompletionRequest), Encoding.UTF8, "application/json");
+            }
+            else
+            {
+                proxyRequest.Content = new StringContent(JsonSerializer.Serialize(_completionRequest), Encoding.UTF8, "application/json");
+            }
 
             if (_completionRequest.Stream)
             {
@@ -331,8 +363,13 @@ public partial class CompletionController(
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    logger.LogWarning("Received non-success status code {statusCode} with message \"{reason}\"", (int)response.StatusCode, response.ReasonPhrase);
-                    return Results.StatusCode((int)response.StatusCode);
+                    logger.LogWarning("Received non-success status code {statusCode} with message \"{reason}\"", (int) response.StatusCode, response.ReasonPhrase);
+                    if (response.StatusCode == HttpStatusCode.BadRequest)
+                    {
+                        var requestContent = await proxyRequest.Content.ReadAsStringAsync(_combinedToken);
+                        logger.LogWarning("{content}", requestContent);
+                    }
+                    return Results.StatusCode((int) response.StatusCode);
                 }
 
                 var stream = await response.Content.ReadAsStreamAsync(_combinedToken);
@@ -352,10 +389,11 @@ public partial class CompletionController(
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    return Results.StatusCode((int)response.StatusCode);
+                    return Results.StatusCode((int) response.StatusCode);
                 }
 
                 var responseContent = await response.Content.ReadAsStringAsync(_combinedToken);
+                logger.LogInformation("{content}", responseContent);
                 return Results.Text(responseContent, "application/json");
             }
         }

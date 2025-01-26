@@ -17,7 +17,7 @@ public class Message
     public required string Content { get; set; }
 }
 
-public class BaseCompletionRequest
+public class MinimalCompletionRequest
 {
     [JsonPropertyName("model")]
     public string Model { get; set; } = string.Empty;
@@ -30,7 +30,10 @@ public class BaseCompletionRequest
 
     [JsonPropertyName("max_tokens")]
     public int MaxTokens { get; set; } = 1024;
+}
 
+public class BaseCompletionRequest : MinimalCompletionRequest
+{
     [JsonPropertyName("temperature")]
     public float Temperature { get; set; }
 

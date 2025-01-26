@@ -17,7 +17,7 @@ public static class Utility
             var result = await httpClient.GetAsync("/health");
             return result.IsSuccessStatusCode;
         }
-        catch (TaskCanceledException exception)
+        catch (TaskCanceledException)
         {
             return false;
         }

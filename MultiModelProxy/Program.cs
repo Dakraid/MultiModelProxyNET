@@ -134,6 +134,9 @@ public class Program
                 credential: new ApiKeyCredential(settings.Inference.OpenRouterSettings!.ApiKey),
                 options: new OpenAIClientOptions { Endpoint = new Uri("https://openrouter.ai/api/v1") }));
             break;
+        
+        default:
+            throw new NotImplementedException("The selected provider is not implemented for CoT generation.");
         }
 
         builder.Services.AddSingleton<ITrackerService, TrackerService>();
